@@ -5,12 +5,12 @@ import arviz as az
 national_working_long=pd.read_csv("national_working_long.csv")
 
 
-
+# model specification:
 model_variables = ['response','rurality','race_selfid_original', 'sample', 'age', 'sex', 'education', 'income', 'homeownership', 'numchild', 'disability', 'coping_appraisal', 'threat_appraisal','dis_iexp']
 national_working_long = national_working_long.dropna(subset=model_variables)
 print(national_working_long[national_working_long['sample'] == 'National'])
 
-
+#data manipulation
 
 national_working_long['rurality'] = national_working_long['rurality'].astype('category')
 national_working_long['item'] = national_working_long['item'].astype('category')
@@ -22,7 +22,7 @@ national_working_long['race_selfid_original'] = national_working_long['race_self
 
 
 
-
+#model work_flow
 categories = national_working_long['sample'].cat.categories.tolist()
 if 'National' in categories:
     new_order = ['National'] + [cat for cat in categories if cat != 'National']
@@ -30,7 +30,7 @@ if 'National' in categories:
         new_order, ordered=True
     )
 else:
-    print("⚠️ 'National' not found in categories!")
+    print("'National' not found in categories!")
 
 
 formula = 'response ~ sample * (age + sex + education +dis_iexp + income + homeownership + numchild + disability + coping_appraisal + threat_appraisal) + (1|id) + (1|item)'
