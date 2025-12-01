@@ -1,0 +1,1983 @@
+---
+title: "data analyse"
+format: html
+editor: visual
+---
+
+## Quarto
+
+```{r}
+install.packages("pkgbuild")  
+pkgbuild::find_rtools()
+install.packages("ncdf4")
+
+
+install.packages("rstan", repos = "https://cloud.r-project.org/", dependencies = TRUE)
+install.packages("purrr")
+
+install.packages("brms")
+install.packages("bayestestR")
+install.packages("viridis")
+
+```
+
+Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
+
+## Running Code
+
+When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+
+```{r}
+install.packages("tidyverse")
+
+install.packages("AER")
+
+
+```
+
+You can add options to executable code like this
+
+```{r}
+library(readxl)
+household_survey<-fema_national_household_survey_2023_data_and_codebook <- read_excel("fema_national_household_survey_2023/fema_national_household_survey_2023_data_and_codebook.xlsx", 
+    sheet = "Core Survey")
+
+summary(household_survey)
+```
+
+The `echo: false` option disables the printing of code (only output is displayed).
+
+```{r}
+library(readxl)
+library(tidyverse)
+library(xtable)
+library(broom)
+national_data <- read_excel("fema_national_household_survey_2023/fema_national_household_survey_2023_data_and_codebook.xlsx", 
+    sheet = "Core Survey", skip = 1)
+
+# colnames(Costal_flooding)
+
+# control vaiable:(1) sex (1= ‘Male’, 2= ‘Female’, 3= ‘Non-binary/third gender’); (2) age (8 consecutive groups from 1= ‘18-19’, ‘20-29’, etc., to 8= ‘80+’); (3) ethnicity & race (1= ‘Hispanic’, 0= ‘Non-Hispanic’, combine with 1= ‘White’, 2= ‘Native Hawaiian or Other Pacific Islander’, 3= ‘Black or African American’, 4= ‘Asian’, 5= ‘American Indian or Alaska Native’);  (4) income (10 consecutive groups from ‘Less than $10000’, ‘$10000-$14999’, etc., to ‘$200000 or more’); (5) education (6 consecutive groups from 1= ‘Less than high school diploma’, ‘High school degree or diploma’, etc., to 6= ‘Post graduate work/ degree or professional degree’).
+print(national_data$disability)
+
+national_working<- select(
+  national_data,
+  sample,
+  id,
+  state,
+  geographic_division,
+  census_region,
+  county,
+  # independent
+  dis_perception,
+  dis_stepshelp,
+  dis_confidence,
+  # dependent
+  dis_prepactions_a:dis_prepactions_l, 
+  # control
+  age,
+  sex,
+  sex_open,
+  education,
+  race_selfid_original,
+  ethnicity,
+  income,
+  rurality,
+  homeownership,
+  numchild,
+  dis_iexp,
+  disability)
+
+national_working <- national_working %>%
+  filter(!sample %in% c("AIANNHOPI", "Radiological Emergency"))
+
+
+
+#coding for dependent variable
+national_working<-national_working%>% mutate(across(dis_prepactions_a:dis_prepactions_l, ~ ifelse(. == "Blank", 0, 1)))
+national_working<-national_working%>%mutate(prepaction_sum=rowSums(across(dis_prepactions_a:dis_prepactions_i)))
+print(national_working$prepaction_sum)
+
+#coding for independent variable
+national_working <- national_working %>%
+  mutate(dis_perception=case_when(
+    dis_perception == "Very likely" ~ 2,
+    dis_perception == "Likely" ~ 1,
+    dis_perception == "Unlikely" ~ 0,
+    dis_perception == "Don't know" ~ NA
+    
+  ))
+
+print(national_working$dis_perception)
+
+national_working<-national_working%>%rename(threat_appraisal=dis_perception)
+
+
+national_working <- national_working %>%
+  mutate(dis_stepshelp = case_when(
+    dis_stepshelp == "A great deal" ~ 4,
+    dis_stepshelp == "Quite a bit" ~ 3,
+    dis_stepshelp == "Somewhat" ~ 2,
+    dis_stepshelp == "Very little" ~ 1,
+    dis_stepshelp == "Not at all" ~ 0,
+    dis_stepshelp == " Don't know"~ NA))
+
+
+national_working <- national_working %>%
+  mutate(dis_confidence = case_when(
+    dis_confidence == "Extremely confident" ~ 4,
+   dis_confidence == "Moderately confident" ~ 3,
+    dis_confidence == "Somewhat confident" ~ 2,
+    dis_confidence == "Slightly confident" ~ 1,
+    dis_confidence == " Not at all confident" ~ 0,
+    dis_confidence == "Don't know" ~ NA))
+
+national_working <- national_working %>%
+  mutate(
+    coping_appraisal = rowSums(
+      select(., dis_confidence, dis_stepshelp),  
+      na.rm = TRUE                              
+    )
+  )
+
+#coding for control
+# age
+national_working <- national_working %>%
+  mutate(
+    age = case_when(
+      age == "18-19" ~ 1,
+      age == "20-29" ~ 2,
+      age == "30-39" ~ 3,
+      age == "40-49" ~ 4,
+      age == "50-59" ~ 5,
+      age == "60-69" ~ 6,
+      age == "70-79" ~ 7,
+      age == "80+"   ~ 8,
+      TRUE           ~ NA_real_   
+    )
+  )
+# income
+national_working <- national_working %>%
+  mutate(
+    income = case_when(
+      income == "Less than $10,000"      ~ 1,
+      income == "$10,000 to $14,999"     ~ 2,
+      income == "$15,000 to $24,999"     ~ 3,
+      income == "$25,000 to $34,999"     ~ 4,
+      income == "$35,000 to $49,999"     ~ 5,
+      income == "$50,000 to $74,999"     ~ 6,
+      income == "$75,000 to $99,999"     ~ 7,
+      income == "$100,000 to $149,999"   ~ 8,
+      income == "$150,000 to $199,999"   ~ 9,
+      income == "$200,000 or more"       ~ 10,
+      income == "Don’t know"             ~ NA_real_,  
+      TRUE                               ~ NA_real_    
+    )
+  )
+
+
+national_working <- national_working %>%
+  mutate(
+    education= case_when(
+      education == "Less than high school diploma"                ~ 1,
+      education == "High school degree or diploma"                ~ 2,
+      education == "Some college, no degree"                      ~ 3,
+      education == "Associate degree"                             ~ 4,
+      education == "Bachelor’s degree"                            ~ 5,
+      education == "Post graduate work/degree or professional degree" ~ 6,
+      education == "Don’t know"                                   ~ NA_real_,
+      TRUE                                                        ~ NA_real_
+    )
+  )
+
+
+national_working$race_selfid_original[national_working$race_selfid_original== "Don't know"] <- NA
+
+# recode category
+
+national_working <- national_working %>%
+  mutate(
+    type = case_when(
+      sample == "Hurricane" ~ "HD_HP",
+      sample %in% c("Riverine Flooding", "Coastal Flooding") ~ "LD_HP",
+      sample %in% c("Earthquake", "Wildfire") ~ "HD_LP",
+      TRUE ~ NA_character_  
+    )
+  )
+
+national_working <- national_working %>%
+  mutate(numchild = as.numeric(numchild))
+
+national_working$dis_iexp<-as.factor(national_working$dis_iexp)
+national_working$dis_iexp<-relevel(national_working$dis_iexp,ref="Yes")
+
+national_working$disability<-as.factor(national_working$disability)
+national_working$disability<-relevel(national_working$disability,ref="No Disability")
+
+
+national_working$threat_appraisal<-as.numeric(national_working$threat_appraisal)
+```
+
+```{r}
+
+national_working$prepaction_sum
+
+age_count<-national_working%>%group_by(age)%>%
+  summarise(Mean=mean(prepaction_sum,na.rm = TRUE),
+            Sd=sd(prepaction_sum,na.rm = TRUE))
+age_count <- age_count %>%
+  mutate(
+    age = case_when(
+      age == 1 ~ "18-19",
+      age == 2 ~ "20-29",
+      age == 3 ~ "30-39",
+      age == 4 ~ "40-49",
+      age == 5 ~ "50-59",
+      age == 6 ~ "60-69",
+      age == 7 ~ "70-79",
+      age == 8 ~ "80+",
+      TRUE     ~ NA_character_
+    )
+  )
+age_count<-age_count%>%rename(variable=age)
+
+
+sex_count<-national_working%>%group_by(sex)%>%
+  summarise(Mean=mean(prepaction_sum,na.rm = TRUE),
+            Sd=sd(prepaction_sum,na.rm = TRUE))
+sex_count<-sex_count%>%rename(variable=sex)
+
+
+education_count<-national_working%>%group_by(education)%>%
+  summarise(Mean=mean(prepaction_sum,na.rm = TRUE),
+            Sd=sd(prepaction_sum,na.rm = TRUE))
+
+education_count <- education_count %>%
+  mutate(
+    education = case_when(
+      education == 1 ~ "Less than high school diploma",
+      education == 2 ~ "High school degree or diploma",
+      education == 3 ~ "Some college, no degree",
+      education == 4 ~ "Associate degree",
+      education == 5 ~ "Bachelor’s degree",
+      education == 6 ~ "Post graduate work/degree or professional degree",
+      TRUE           ~ NA_character_ 
+    )
+  )
+
+
+
+education_count<-education_count%>%rename(variable=education)
+
+
+
+race_count<-national_working%>%group_by(race_selfid_original)%>%
+  summarise(Mean=mean(prepaction_sum,na.rm = TRUE),
+            Sd=sd(prepaction_sum,na.rm = TRUE))
+
+race_count<-race_count%>%rename(variable=race_selfid_original)
+
+
+ethnicity_count<-national_working%>%group_by(ethnicity)%>%
+  summarise(Mean=mean(prepaction_sum,na.rm = TRUE),
+            Sd=sd(prepaction_sum,na.rm = TRUE))
+
+
+ethnicity_count<-ethnicity_count%>%rename(variable=ethnicity)
+
+
+income_count<-national_working%>%group_by(income)%>%
+  summarise(Mean=mean(prepaction_sum,na.rm = TRUE),
+            Sd=sd(prepaction_sum,na.rm = TRUE))
+
+
+income_count<- income_count %>%
+  mutate(
+    income = case_when(
+      income == 1  ~ "Less than $10,000",
+      income == 2  ~ "$10,000 to $14,999",
+      income == 3  ~ "$15,000 to $24,999",
+      income == 4  ~ "$25,000 to $34,999",
+      income == 5  ~ "$35,000 to $49,999",
+      income == 6  ~ "$50,000 to $74,999",
+      income == 7  ~ "$75,000 to $99,999",
+      income == 8  ~ "$100,000 to $149,999",
+      income == 9  ~ "$150,000 to $199,999",
+      income == 10 ~ "$200,000 or more",
+      TRUE         ~ NA_character_ 
+    )
+  )
+
+income_count<-income_count%>%rename(variable=income)
+
+
+
+rurality_count<-national_working%>%group_by(rurality)%>%
+  summarise(Mean=mean(prepaction_sum,na.rm = TRUE),
+            Sd=sd(prepaction_sum,na.rm = TRUE))
+
+
+rurality_count<-rurality_count%>%rename(variable=rurality)
+
+homeownership_count<-national_working%>%group_by(homeownership)%>%
+  summarise(Mean=mean(prepaction_sum,na.rm = TRUE),
+            Sd=sd(prepaction_sum,na.rm = TRUE))
+
+homeownership_count<-homeownership_count%>%rename(variable=homeownership)
+
+
+
+
+
+
+numchild_count<- national_working %>%
+  mutate(
+    numchild = ifelse(numchild > 3, "More Than 3", numchild)
+  )
+
+numchild_count<-numchild_count%>%group_by(numchild)%>%
+  summarise(Mean=mean(prepaction_sum,na.rm = TRUE),
+            Sd=sd(prepaction_sum,na.rm = TRUE))
+
+numchild_count<-numchild_count%>%rename(variable=numchild)
+
+
+exp_count<-national_working%>%group_by(dis_iexp)%>%
+  summarise(Mean=mean(prepaction_sum,na.rm = TRUE),
+            Sd=sd(prepaction_sum,na.rm = TRUE))
+
+exp_count<-exp_count%>%rename(variable=dis_iexp)
+
+
+
+disability_count<-national_working%>%group_by(disability)%>%
+  summarise(Mean=mean(prepaction_sum,na.rm = TRUE),
+            Sd=sd(prepaction_sum,na.rm = TRUE))
+
+disability_count<-disability_count%>%rename(variable=disability)
+
+
+count_all<-rbind(age_count,sex_count,education_count,race_count,ethnicity_count,income_count,rurality_count,numchild_count,exp_count,disability_count)
+
+
+count_all<-count_all%>%filter(is.na(variable)==FALSE)
+
+
+count_all<-count_all%>%filter(variable!="Non-Hispanic/Latino")
+
+
+count_all<-count_all%>%mutate(variable=ifelse(variable=="Other (please specify):","Other",variable))
+
+count_all_table<-xtable(count_all)
+
+print(count_all_table,type = "latex",file="count_all.tex")
+
+
+
+```
+
+```{r}
+# age
+age_percentage <- national_working %>%
+  count(age) %>% 
+  mutate(percentage = n / sum(n) * 100) 
+age_percentage <- age_percentage %>%
+  mutate(
+    age = case_when(
+      age == 1 ~ "18-19",
+      age == 2 ~ "20-29",
+      age == 3 ~ "30-39",
+      age == 4 ~ "40-49",
+      age == 5 ~ "50-59",
+      age == 6 ~ "60-69",
+      age == 7 ~ "70-79",
+      age == 8 ~ "80+",
+      TRUE     ~ NA_character_
+    )
+  )
+age_percentage<-age_percentage%>%rename(variable=age)
+
+
+#education 
+education_percentage <- national_working %>%
+  count(education) %>% 
+  mutate(percentage = n / sum(n) * 100) 
+
+education_percentage <- education_percentage %>%
+  mutate(
+    education = case_when(
+      education == 1 ~ "Less than high school diploma",
+      education == 2 ~ "High school degree or diploma",
+      education == 3 ~ "Some college, no degree",
+      education == 4 ~ "Associate degree",
+      education == 5 ~ "Bachelor’s degree",
+      education == 6 ~ "Post graduate work/degree or professional degree",
+      TRUE           ~ NA_character_ 
+    )
+  )
+
+
+
+education_percentage<-education_percentage%>%rename(variable=education)
+
+# sex
+
+sex_percentage <- national_working %>%
+  count(sex) %>% 
+  mutate(percentage = n / sum(n) * 100) 
+
+sex_percentage<-sex_percentage%>%rename(variable=sex)
+
+
+# race
+race_percentage <- national_working %>%
+  count(race_selfid_original) %>% 
+  mutate(percentage = n / sum(n) * 100) 
+
+race_percentage<-race_percentage%>%rename(variable=race_selfid_original)
+
+# ethnicity
+ethnicity_percentage <- national_working %>%
+  count(ethnicity) %>% 
+  mutate(percentage = n / sum(n) * 100) 
+
+ethnicity_percentage<-ethnicity_percentage%>%rename(variable=ethnicity)
+
+# income
+income_percentage <- national_working %>%
+  count(income) %>% 
+  mutate(percentage = n / sum(n) * 100) 
+
+income_percentage<- income_percentage %>%
+  mutate(
+    income = case_when(
+      income == 1  ~ "Less than $10,000",
+      income == 2  ~ "$10,000 to $14,999",
+      income == 3  ~ "$15,000 to $24,999",
+      income == 4  ~ "$25,000 to $34,999",
+      income == 5  ~ "$35,000 to $49,999",
+      income == 6  ~ "$50,000 to $74,999",
+      income == 7  ~ "$75,000 to $99,999",
+      income == 8  ~ "$100,000 to $149,999",
+      income == 9  ~ "$150,000 to $199,999",
+      income == 10 ~ "$200,000 or more",
+      TRUE         ~ NA_character_ 
+    )
+  )
+income_percentage<-income_percentage%>%rename(variable=income)
+
+# rurality
+
+rurality_percentage <- national_working %>%
+  count(rurality) %>% 
+  mutate(percentage = n / sum(n) * 100) 
+rurality_percentage<-rurality_percentage%>%rename(variable=rurality)
+
+
+# homeownership
+homeownership_percentage <- national_working %>%
+  count(homeownership) %>% 
+  mutate(percentage = n / sum(n) * 100) 
+homeownership_percentage<-homeownership_percentage%>%rename(variable=homeownership)
+
+# numbchild
+
+numchild_percentage<- national_working %>%
+  mutate(
+    numchild = ifelse(numchild > 3, "More Than 3", numchild)
+  )
+
+numchild_percentage <- numchild_percentage %>%
+  count(numchild) %>% 
+  mutate(percentage = n / sum(n) * 100) 
+numchild_percentage<-numchild_percentage%>%rename(variable=numchild)
+
+# experience
+
+
+exp_percentage <- national_working %>%
+  count(dis_iexp) %>% 
+  mutate(percentage = n / sum(n) * 100) 
+exp_percentage<-exp_percentage%>%rename(variable=dis_iexp)
+
+# disability
+disability_percentage <- national_working %>%
+  count(disability) %>% 
+  mutate(percentage = n / sum(n) * 100) 
+disability_percentage<-disability_percentage%>%rename(variable=disability)
+
+
+percentage_all <- rbind(
+  age_percentage,
+  sex_percentage,
+  education_percentage,
+  race_percentage,
+  ethnicity_percentage,
+  income_percentage,
+  rurality_percentage,
+  numchild_percentage,
+  exp_percentage,
+  disability_percentage
+)
+
+
+percentage_all <- percentage_all %>%
+  filter(!is.na(variable))
+
+percentage_all <- percentage_all %>%
+  filter(variable != "Non-Hispanic/Latino")
+
+percentage_all <- percentage_all %>%
+  mutate(variable = ifelse(variable == "Other (please specify):", "Other", variable))
+
+percentage_all_table <- xtable(percentage_all)
+
+print(percentage_all_table, type = "latex", file = "percentage_all.tex")
+
+
+```
+
+```{r}
+# summary statistics
+
+library(ggplot2)
+summary_stat <- national_working %>%
+  group_by(sample) %>%
+  summarize(
+    threat_appraisal_mean = mean(threat_appraisal, na.rm = TRUE),
+    coping_appraisal_mean = mean(coping_appraisal, na.rm = TRUE),
+    prepaction_sum_mean=mean(prepaction_sum,na.rm = TRUE)
+  )
+
+
+
+summary_stat <- summary_stat %>%
+  filter(!sample %in% c("AIANNHOPI", "Radiological Emergency"))
+
+summary_stat<-summary_stat%>%slice(c(4,1:n()))
+summary_stat
+summary_stat$threat_appraisal_mean<-log(summary_stat$threat_appraisal_mean)
+summary_stat$coping_appraisal_mean<-log(summary_stat$coping_appraisal_mean)
+summary_stat$prepaction_sum_mean<-log(summary_stat$prepaction_sum_mean)
+
+ggplot(summary_stat,aes(x=sample,y=coping_appraisal_mean))+
+  geom_bar(stat = "identity", position = position_dodge(width = 0.8)) +
+  labs(
+    title = "Mean of Threat and Coping Appraisal by Sample",
+    x = "Sample",
+    y = "Mean Value",
+    fill = "Mean Type"
+  ) +
+  theme_minimal()
+
+summary_stat_long<-summary_stat%>%pivot_longer(cols=c("threat_appraisal_mean","coping_appraisal_mean","prepaction_sum_mean"),names_to = "Meantype",values_to = "MeanValue")
+
+summary_stat_bar<-summary_stat_long%>%filter(Meantype%in%c("threat_appraisal_mean","coping_appraisal_mean"))
+
+summary_stat_line<-summary_stat_long%>%filter(Meantype=="prepaction_sum_mean")
+
+
+
+ggplot() +
+
+  geom_col(
+    data = summary_stat_bar,
+    aes(x = sample, y = MeanValue, fill = Meantype),
+    position = position_dodge(width = 0.8)  
+  ) +
+
+  geom_line(
+    data = summary_stat_line,
+
+    aes(x = sample, y = MeanValue, group = 1),  
+    color = "black",
+    size = 1
+  ) +
+
+  geom_point(
+    data = summary_stat_line,
+    aes(x = sample, y = MeanValue),
+    color = "black",
+    size = 3
+  ) +
+ annotate(
+    "text", 
+    x = min(summary_stat_line$sample),         
+    y = min(summary_stat_line$MeanValue)-0.1,     
+    label = "Mean of Preparation",                           
+    color = "black",                            
+    size = 5,                                 
+    hjust = -0.1                              
+  ) +
+  labs(
+    title = "Mean(log)",
+    x = "Sample Type",
+    y = "Mean Value",
+    fill="Meantype",
+    color="Meantype") +
+  theme_minimal()
+
+```
+
+```{r}
+summary_stat_round <- national_working %>%
+  group_by(sample) %>%
+  summarize(
+    threat_appraisal_mean = mean(threat_appraisal, na.rm = TRUE),
+    coping_appraisal_mean = mean(coping_appraisal, na.rm = TRUE),
+    prepaction_sum_mean=mean(prepaction_sum,na.rm = TRUE)
+  )
+
+summary_stat_round<-summary_stat_round%>%mutate(across(where(is.numeric), ~ round(., 2)))
+
+
+summary_stat_lax<-xtable(summary_stat_round)
+print(summary_stat_lax,type = "latex",file="summary_stat.tex")
+
+
+```
+
+```{r}
+library(AER)
+library(lmtest)
+library(zoo)
+library(car)
+library(carData)
+# anova
+national_anova<-national_working%>%select(sample,prepaction_sum,type)
+
+compare_model<-aov(prepaction_sum~sample,data=national_anova)
+
+summary(compare_model)
+
+compare_reg<-lm(prepaction_sum~sample,data=national_anova)
+
+compare_tobit<-tobit(prepaction_sum~type,data=national_anova)
+
+summary(compare_tobit)
+summary(compare_reg)
+
+compare_model_lat<-xtable(compare_model)
+
+print(compare_model_lat,type = "latex",file="compare_model_lat.tex")
+```
+
+```{r}
+# overall model
+
+all_model1<-tobit(prepaction_sum~age+sex+education+race_selfid_original+ethnicity+income+rurality+homeownership+numchild+dis_iexp+disability,data=national_working)
+
+summary(all_model1)
+
+all_model2<-tobit(prepaction_sum~age+sex+education+race_selfid_original+ethnicity+income+rurality+homeownership+numchild+dis_iexp+disability+threat_appraisal+coping_appraisal,data=national_working)
+
+summary(all_model2)
+
+
+coeftest_result <- coeftest(all_model1)
+print(coeftest_result)
+
+beta_values <- coeftest_result[, 1] 
+p_values <- coeftest_result[, 4]    
+
+
+all_result_table1<- data.frame(
+  term = rownames(coeftest_result), 
+  estimate = beta_values,          
+  p_value = p_values               
+)
+
+all_result_table1
+
+
+coeftest_result <- coeftest(all_model2)
+print(coeftest_result)
+
+beta_values <- coeftest_result[, 1] 
+p_values <- coeftest_result[, 4]    
+
+
+all_result_table2 <- data.frame(
+  term = rownames(coeftest_result), 
+  estimate = beta_values,          
+  p_value = p_values               
+)
+all_model
+all_model<-full_join(all_result_table1,all_result_table2,by="term")
+
+all_model<-all_model%>%rename(coefficients_model1=estimate.x)
+all_model<-all_model%>%rename(coefficients_model2=estimate.y)
+all_model<-all_model%>%rename(P_value_model1=p_value.x)
+all_model<-all_model%>%rename(P_value_model2=p_value.y)
+
+all_model_lat<-xtable(all_model)
+print(all_model_lat, type = "latex", file = "all_model.tex")
+
+
+```
+
+```{r}
+# model for hurriance
+library(car)
+library(carData)
+library(lmtest)
+library(zoo)
+library(AER)
+hurriance<-national_working%>%filter(sample=="Hurricane")
+
+hurriance_model1<-tobit(prepaction_sum~age+sex+education+race_selfid_original+ethnicity+income+rurality+homeownership+numchild+dis_iexp+disability,data=hurriance)
+
+hurriance_model2<-tobit(prepaction_sum~age+sex+education+race_selfid_original+ethnicity+income+rurality+homeownership+numchild+dis_iexp+disability+threat_appraisal+coping_appraisal,data=hurriance)
+
+summary(hurriance_model1)
+summary(hurriance_model2)
+
+
+coeftest_result <- coeftest(hurriance_model1)
+print(coeftest_result)
+
+beta_values <- coeftest_result[, 1] 
+p_values <- coeftest_result[, 4]    
+
+
+hurriance_result_table1<- data.frame(
+  term = rownames(coeftest_result), 
+  estimate = beta_values,          
+  p_value = p_values               
+)
+
+
+
+
+coeftest_result <- coeftest(hurriance_model2)
+print(coeftest_result)
+
+beta_values <- coeftest_result[, 1] 
+p_values <- coeftest_result[, 4]    
+
+
+hurriance_result_table2 <- data.frame(
+  term = rownames(coeftest_result), 
+  estimate = beta_values,          
+  p_value = p_values               
+)
+
+hurriance_model<-full_join(hurriance_result_table1,hurriance_result_table2,by="term")
+hurriance_model
+
+hurriance_model<-hurriance_model%>%rename(coefficients_model1=estimate.x)
+hurriance_model<-hurriance_model%>%rename(coefficients_model2=estimate.y)
+hurriance_model<-hurriance_model%>%rename(P_value_model1=p_value.x)
+hurriance_model<-hurriance_model%>%rename(P_value_model2=p_value.y)
+
+hurriance_model_lat<-xtable(hurriance_model)
+print(all_model_lat, type = "latex", file = "hurriance_model.tex")
+
+
+ 
+```
+
+```{r}
+# riverine flooding
+river_flood<-national_working%>%filter(sample=="Riverine Flooding")
+riverflood_model1<-tobit(prepaction_sum~age+sex+education+race_selfid_original+ethnicity+income+rurality+homeownership+numchild+dis_iexp+disability,data=river_flood)
+riverflood_model2<-tobit(prepaction_sum~age+sex+education+race_selfid_original+ethnicity+income+rurality+homeownership+numchild+dis_iexp+disability+threat_appraisal+coping_appraisal,data=river_flood)
+
+summary(riverflood_model1)
+summary(riverflood_model2)
+
+
+
+
+coeftest_result <- coeftest(riverflood_model1)
+print(coeftest_result)
+
+beta_values <- coeftest_result[, 1] 
+p_values <- coeftest_result[, 4]    
+
+
+riverflood_result_table1<- data.frame(
+  term = rownames(coeftest_result), 
+  estimate = beta_values,          
+  p_value = p_values               
+)
+
+
+
+
+coeftest_result <- coeftest(riverflood_model2)
+print(coeftest_result)
+
+beta_values <- coeftest_result[, 1] 
+p_values <- coeftest_result[, 4]    
+
+
+riverflood_result_table2 <- data.frame(
+  term = rownames(coeftest_result), 
+  estimate = beta_values,          
+  p_value = p_values               
+)
+
+riverflood_model<-full_join(riverflood_result_table1,riverflood_result_table2,by="term")
+
+
+riverflood_model<-riverflood_model%>%rename(coefficients_model1=estimate.x)
+riverflood_model<-riverflood_model%>%rename(coefficients_model2=estimate.y)
+riverflood_model<-riverflood_model%>%rename(P_value_model1=p_value.x)
+riverflood_model<-riverflood_model%>%rename(P_value_model2=p_value.y)
+
+riverflood_model_lat<-xtable(riverflood_model)
+print(riverflood_model_lat, type = "latex", file = "riverflood_model.tex")
+
+```
+
+```{r}
+# Costal flooding
+costal_flood<-national_working%>%filter(sample=="Coastal Flooding")
+
+costalflood_model1<-riverflood_model1<-tobit(prepaction_sum~age+sex+education+race_selfid_original+ethnicity+income+rurality+homeownership+numchild+dis_iexp+disability,data=costal_flood)
+
+summary(costalflood_model1)
+
+costalflood_model2<-tobit(prepaction_sum~age+sex+education+race_selfid_original+ethnicity+income+rurality+homeownership+numchild+dis_iexp++disability+threat_appraisal+coping_appraisal,data=costal_flood)
+
+summary(costalflood_model2)
+
+
+
+coeftest_result <- coeftest(costalflood_model1)
+print(coeftest_result)
+
+beta_values <- coeftest_result[, 1] 
+p_values <- coeftest_result[, 4]    
+
+
+costalflood_result_table1<- data.frame(
+  term = rownames(coeftest_result), 
+  estimate = beta_values,          
+  p_value = p_values               
+)
+
+
+
+
+coeftest_result <- coeftest(costalflood_model2)
+print(coeftest_result)
+
+beta_values <- coeftest_result[, 1] 
+p_values <- coeftest_result[, 4]    
+
+
+costalflood_result_table2 <- data.frame(
+  term = rownames(coeftest_result), 
+  estimate = beta_values,          
+  p_value = p_values               
+)
+
+costalflood_model<-full_join(costalflood_result_table1,costalflood_result_table2,by="term")
+
+
+costalflood_model<-costalflood_model%>%rename(coefficients_model1=estimate.x)
+costalflood_model<-costalflood_model%>%rename(coefficients_model2=estimate.y)
+costalflood_model<-costalflood_model%>%rename(P_value_model1=p_value.x)
+costalflood_model<-costalflood_model%>%rename(P_value_model2=p_value.y)
+
+costalflood_model_model_lat<-xtable(costalflood_model)
+print(costalflood_model_model_lat, type = "latex", file = "costalflood_modeld.tex")
+
+```
+
+```{r}
+# Earthquakes
+earthquakes<-national_working%>%filter(sample=="Earthquake")
+
+earthquake_model1<-tobit(prepaction_sum~age+sex+education+race_selfid_original+ethnicity+income+rurality+homeownership+numchild+dis_iexp+disability,data=earthquakes)
+
+summary(earthquake_model1)
+
+earthquake_model2<-tobit(prepaction_sum~age+sex+education+race_selfid_original+ethnicity+income+rurality+homeownership+numchild+dis_iexp+disability+threat_appraisal+coping_appraisal,data=earthquakes)
+
+summary(earthquake_model2)
+
+
+coeftest_result <- coeftest(earthquake_model1)
+print(coeftest_result)
+
+beta_values <- coeftest_result[, 1] 
+p_values <- coeftest_result[, 4]    
+
+
+earthquake_result_table1<- data.frame(
+  term = rownames(coeftest_result), 
+  estimate = beta_values,          
+  p_value = p_values               
+)
+
+
+
+
+coeftest_result <- coeftest(earthquake_model2)
+print(coeftest_result)
+
+beta_values <- coeftest_result[, 1] 
+p_values <- coeftest_result[, 4]    
+
+
+earthquake_result_table2 <- data.frame(
+  term = rownames(coeftest_result), 
+  estimate = beta_values,          
+  p_value = p_values               
+)
+
+earthquake_model<-full_join(earthquake_result_table1,earthquake_result_table2,by="term")
+
+
+earthquake_model<-earthquake_model%>%rename(coefficients_model1=estimate.x)
+earthquake_model<-earthquake_model%>%rename(coefficients_model2=estimate.y)
+earthquake_model<-earthquake_model%>%rename(P_value_model1=p_value.x)
+earthquake_model<-earthquake_model%>%rename(P_value_model2=p_value.y)
+
+earthquake_model_lat<-xtable(earthquake_model)
+print(earthquake_model_lat, type = "latex", file = "earthquake_model.tex")
+
+```
+
+```{r}
+# Wildfire
+wildfire<-national_working%>%filter(sample=="Wildfire")
+
+wildfire_model1<-tobit(prepaction_sum~age+sex+education+race_selfid_original+ethnicity+income+rurality+homeownership+numchild+dis_iexp+disability,data=wildfire)
+
+summary(wildfire_model1)
+
+wildfire_model2<-tobit(prepaction_sum~age+sex+education+race_selfid_original+ethnicity+income+rurality+homeownership+numchild+dis_iexp+disability+threat_appraisal+coping_appraisal,data=wildfire)
+
+summary(wildfire_model2)
+
+coeftest_result <- coeftest(wildfire_model1)
+print(coeftest_result)
+
+beta_values <- coeftest_result[, 1] 
+p_values <- coeftest_result[, 4]    
+
+
+wildfire_result_table1<- data.frame(
+  term = rownames(coeftest_result), 
+  estimate = beta_values,          
+  p_value = p_values               
+)
+
+
+
+
+coeftest_result <- coeftest(wildfire_model2)
+print(coeftest_result)
+
+beta_values <- coeftest_result[, 1] 
+p_values <- coeftest_result[, 4]    
+
+
+wildfire_result_table2 <- data.frame(
+  term = rownames(coeftest_result), 
+  estimate = beta_values,          
+  p_value = p_values               
+)
+
+wildfire_model<-full_join(wildfire_result_table1,wildfire_result_table2,by="term")
+
+
+wildfire_model<-wildfire_model%>%rename(coefficients_model1=estimate.x)
+wildfire_model<-wildfire_model%>%rename(coefficients_model2=estimate.y)
+wildfire_model<-wildfire_model%>%rename(P_value_model1=p_value.x)
+wildfire_model<-wildfire_model%>%rename(P_value_model2=p_value.y)
+
+wildfire_model_lat<-xtable(wildfire_model)
+print(wildfire_model_lat, type = "latex", file = "wildfire_model.tex")
+
+
+```
+
+```{r}
+# category
+LD_HP<-national_working%>%filter(type=="LD_HP")
+LD_HP_model1<-tobit(prepaction_sum~age+sex+education+race_selfid_original+ethnicity+income+rurality+homeownership+numchild+dis_iexp+disability,data=LD_HP)
+
+summary(LD_HP_model1)
+
+LD_HP_model2<-tobit(prepaction_sum~age+sex+education+race_selfid_original+ethnicity+income+rurality+homeownership+numchild+dis_iexp+disability+threat_appraisal+coping_appraisal,data=LD_HP)
+summary(LD_HP_model2)
+
+LD_HP_model3<-tobit(prepaction_sum~threat_appraisal+coping_appraisal,data=LD_HP)
+summary(LD_HP_model3)
+
+coeftest_result <- coeftest(LD_HP_model1)
+print(coeftest_result)
+
+beta_values <- coeftest_result[, 1] 
+p_values <- coeftest_result[, 4]    
+
+
+LD_HP_result_table1<- data.frame(
+  term = rownames(coeftest_result), 
+  estimate = beta_values,          
+  p_value = p_values               
+)
+
+
+
+
+coeftest_result <- coeftest(LD_HP_model2)
+print(coeftest_result)
+
+beta_values <- coeftest_result[, 1] 
+p_values <- coeftest_result[, 4]    
+
+
+LD_HP_result_table2 <- data.frame(
+  term = rownames(coeftest_result), 
+  estimate = beta_values,          
+  p_value = p_values               
+)
+
+LD_HP_model<-full_join(LD_HP_result_table1,LD_HP_result_table2,by="term")
+
+
+LD_HP_model<-LD_HP_model%>%rename(coefficients_model1=estimate.x)
+LD_HP_model<-LD_HP_model%>%rename(coefficients_model2=estimate.y)
+LD_HP_model<-LD_HP_model%>%rename(P_value_model1=p_value.x)
+LD_HP_model<-LD_HP_model%>%rename(P_value_model2=p_value.y)
+
+LD_HP_model_lat<-xtable(LD_HP_model)
+print(LD_HP_model_lat, type = "latex", file = "LD_HP_model.tex")
+
+
+```
+
+```{r}
+HD_LP<-national_working%>%filter(type=="HD_LP")
+HD_LP_model1<-tobit(prepaction_sum~age+sex+education+race_selfid_original+ethnicity+income+rurality+homeownership+numchild+dis_iexp+disability,data=HD_LP)
+
+summary(HD_LP_model1)
+
+HD_LP_model2<-tobit(prepaction_sum~age+sex+education+race_selfid_original+ethnicity+income+rurality+homeownership+numchild+dis_iexp+disability+threat_appraisal+coping_appraisal,data=HD_LP)
+
+summary(HD_LP_model2)
+
+HD_LP_model3<-tobit(prepaction_sum~threat_appraisal+coping_appraisal,data=HD_LP)
+
+summary(HD_LP_model3)
+
+coeftest_result <- coeftest(HD_LP_model1)
+print(coeftest_result)
+
+beta_values <- coeftest_result[, 1] 
+p_values <- coeftest_result[, 4]    
+
+
+HD_LP_result_table1<- data.frame(
+  term = rownames(coeftest_result), 
+  estimate = beta_values,          
+  p_value = p_values               
+)
+
+
+
+
+coeftest_result <- coeftest(HD_LP_model2)
+print(coeftest_result)
+
+beta_values <- coeftest_result[, 1] 
+p_values <- coeftest_result[, 4]    
+
+
+HD_LP_result_table2 <- data.frame(
+  term = rownames(coeftest_result), 
+  estimate = beta_values,          
+  p_value = p_values               
+)
+
+HD_LP_model<-full_join(HD_LP_result_table1,HD_LP_result_table2,by="term")
+
+
+HD_LP_model<-HD_LP_model%>%rename(coefficients_model1=estimate.x)
+HD_LP_model<-HD_LP_model%>%rename(coefficients_model2=estimate.y)
+HD_LP_model<-HD_LP_model%>%rename(P_value_model1=p_value.x)
+HD_LP_model<-HD_LP_model%>%rename(P_value_model2=p_value.y)
+
+HD_LP_model_lat<-xtable(HD_LP_model)
+print(HD_LP_model_lat, type = "latex", file = "HD_LP_model.tex")
+
+
+```
+
+```{r}
+# cif
+
+vif_model<-vif(all_model2)
+
+vif_model
+
+
+```
+
+```{r}
+# match
+library(MatchIt)
+national_match<-national_working%>%mutate(treatment=case_when(type=="HD_HP"~0,
+                                                              type=="HD_LP"~1,
+                                                              TRUE~ NA_real_ 
+  
+))
+
+national_match <- national_match %>%
+  filter(treatment %in% c(1, 0))
+
+national_match_clean <- national_match %>%
+  drop_na(age, sex, education, race_selfid_original, ethnicity, income, rurality, homeownership, numchild, dis_iexp)
+
+match_hp_lp<-matchit(treatment~age+sex+education+race_selfid_original+ethnicity+income+rurality+homeownership+numchild+dis_iexp,data=national_match_clean,method = "nearest", distance = "logit")
+
+plot(match_hp_lp, type = "qq")         
+plot(match_hp_lp, type = "hist")
+```
+
+```{r}
+test<-national_working%>%filter(Disabi)
+```
+
+```{r}
+#fancy staff
+
+library(Rcpp)
+library(brms)
+
+library(tidyverse)
+names(national_working)
+
+national_working_long <- national_working %>%
+  mutate(across(starts_with("dis_prepactions_"), ~ as.character(.))) %>%
+  pivot_longer(
+    cols = starts_with("dis_prepactions_"),
+    names_to = "item",
+    values_to = "response"
+  ) %>%
+  mutate(response = as.factor(response))  # 如果你想让 response 是 factor 类型
+
+
+
+national_working_long <- national_working_long %>%
+  mutate(item = str_remove(item, "dis_prepactions_")) 
+
+national_working_long$item <- as.factor(national_working_long$item)
+national_working_long$sample<-as.factor(national_working_long$sample)
+national_working_long$id<-as.factor(national_working_long$id)
+names(national_working_long)
+national_working_long$race_selfid_original<-as.factor(national_working_long$race_selfid_original)
+national_working_long <- national_working_long %>%
+  filter(race_selfid_original != "Other (please specify):")
+
+national_working_long <- national_working_long %>%
+  filter(race_selfid_original != "Other (please specify):") %>%
+  mutate(race_selfid_original = droplevels(race_selfid_original))
+
+national_working_long$rurality<-as.factor(national_working_long$rurality)
+
+levels(national_working_long$rurality)
+
+```
+
+```{r}
+library(ggplot2)
+library(grid)
+
+figure5 <- ggplot(national_working, aes(x = prepaction_sum, color = sample, fill = sample)) +
+  geom_density(alpha = 0.3) +
+  labs(
+    title = "Density of Preparedness Actions by Risk Type",
+    x = "Preparedness Score (prepaction_sum)",
+    y = "Density",
+    color = "Risk Type",
+    fill = "Risk Type"
+  ) +
+  theme_minimal() +
+  theme(
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background = element_rect(fill = "white", color = NA),
+    
+    
+    legend.text = element_text(size = 18),
+    legend.title = element_text(size = 20, face = "bold"),
+    legend.key.size = unit(1.2, "lines"),
+    
+    
+    axis.title.x = element_text(size = 18),
+    axis.title.y = element_text(size = 18),
+    axis.text.x = element_text(size = 20),
+    axis.text.y = element_text(size = 20),
+    
+   
+    plot.title = element_text(size = 20, face = "bold")
+  )
+
+
+ggsave("figure5.png", plot=figure5,width = 15, height = 12, dpi = 300)
+
+```
+
+```{r}
+#model_building_fancy_model2
+
+national_working_long$sample <- relevel(factor(national_working_long$sample), ref = "National")
+
+# formula <- bf(
+#   response ~ 1 + sample* (age +sex+education + income+homeownership+numchild+disability+coping_appraisal+threat_appraisal) +
+#     (1 |i| id) +
+#     (1 |j| item) +
+#     (0 + sample |j| item))
+
+
+
+
+formula2 <- bf(
+  response ~ 1 + sample* (age +sex+education + income+homeownership+numchild+disability+rurality+race_selfid_original+coping_appraisal+threat_appraisal) +
+    (1 |i| id) +
+    (1 |j| item) 
+    )
+
+priors <- c(
+  prior(normal(0, 0.5), class = "b"),          
+  prior(normal(0, 0.5), class = "sd"),           
+  prior(normal(0, 0.5), class = "Intercept")     
+)
+
+
+# model_fancy <- brm(
+#   formula = formula,
+#   data = national_working_long,
+#   family = bernoulli(link = "logit"), 
+#   prior = priors,
+#   chains = 8,
+#   cores = 8,
+#   iter = 2000,
+#   control = list(adapt_delta = 0.95, max_treedepth = 15)
+# )
+
+
+model_fancy2 <- brm(
+  formula = formula2,
+  data = national_working_long,
+  family = bernoulli(link = "logit"), 
+  prior = priors,
+  chains = 8,
+  cores = 8,
+  iter = 4000,
+  control = list(adapt_delta = 0.95, max_treedepth = 15)
+)
+
+
+```
+
+```{r}
+summary(model_fancy2)
+```
+
+head(fancy_direction)
+
+```{r}
+
+```
+
+```{r}
+library(bayestestR)
+
+posterior_summary <- posterior_summary(model_fancy2)
+
+
+item_effects <- posterior_summary[grep("^r_item\\[", rownames(posterior_summary)), ]
+
+
+item_names <- gsub("r_item\\[|\\,Intercept\\]", "", rownames(item_effects))
+item_b <- data.frame(
+  item = item_names,
+  b = item_effects[, "Estimate"]
+)
+
+
+theta <- seq(-3, 3, length.out = 200)
+
+
+icc_df <- data.frame()
+for (i in 1:nrow(item_b)) {
+  p <- plogis(theta - item_b$b[i])  # logit^{-1}(theta - b_j)
+  icc_df <- rbind(icc_df, data.frame(theta = theta, prob = p, item = item_b$item[i]))
+}
+
+ggplot(icc_df, aes(x = theta, y = prob, color = item)) +
+  geom_line() +
+  labs(title = "Item Characteristic Curves (ICC)",
+       x = expression(theta),
+       y = "P(Prepared)",
+       color = "Item") +
+  theme_minimal()
+
+```
+
+```{r}
+library(ggplot2)
+library(tidyverse)
+
+item_effects_fancy_model<- ranef(model_fancy2)$item[, , "Intercept"] %>%
+  as.data.frame() %>%
+  rownames_to_column("item")
+item_labels <- c(
+  "a" = "Assembled or updated supplies",
+  "b" = "Documented and insured property",
+  "c" = "Got involved in my community",
+  "d" = "Learned my evacuation routes",
+  "e" = "Made a plan",
+  "f" = "Made my home safer",
+  "g" = "Planned with neighbors",
+  "h" = "Practiced emergency drills or habits",
+  "i" = "Safeguarded documents",
+  "j" = "Saved for a rainy day",
+  "k" = "Tested family communication plan",
+  "l" = "Reviewed insurance coverage"   
+)
+item_effects_fancy_model$item <- item_labels[item_effects_fancy_model$item]
+
+
+difficulity <- ggplot(item_effects_fancy_model, aes(x = reorder(item, Estimate), y = Estimate, color = item)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = Q2.5, ymax = Q97.5), width = 0.3, size = 0.8) +
+  coord_flip() +
+  scale_color_viridis_d(option = "D") + 
+  labs(
+    title = "Estimated Difficulty by Item",
+    subtitle = "Point estimates with 95% credible intervals",
+    x = NULL,
+    y = expression("Estimated Difficulty (" * b[j] * ")")
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    # 背景设置
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background = element_rect(fill = "white", color = NA),
+
+    # 图例设置（如不需要图例，可设置为 "none"）
+    legend.position = "none",
+
+    # 坐标轴标题和刻度字体大小
+    axis.title.x = element_text(size = 18),
+    axis.title.y = element_text(size = 15),
+    axis.text.x = element_text(size = 20),
+    axis.text.y = element_text(size = 15, angle = 45, hjust = 1),
+
+    # 标题和副标题设置
+    plot.title = element_text(size = 20, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 12, color = "gray30"),
+
+    # 网格线设置
+    panel.grid.minor = element_blank(),
+    panel.grid.major.y = element_blank()
+  )
+
+
+ggsave("figure4.png", plot=difficulity,width = 20, height = 20, dpi = 300)
+
+
+
+```
+
+```{r}
+#seperate
+
+
+
+age_params <- fancy_direction[grepl("age", fancy_direction$Parameter, ignore.case = TRUE), ]
+
+sex_params <- fancy_direction[grepl("sex", fancy_direction$Parameter, ignore.case = TRUE), ]
+
+
+education_params <- fancy_direction[grepl("education", fancy_direction$Parameter, ignore.case = TRUE), ]
+
+income_params <- fancy_direction[grepl("income", fancy_direction$Parameter, ignore.case = TRUE), ]
+
+homeownership_params <- fancy_direction[grepl("homeownership", fancy_direction$Parameter, ignore.case = TRUE), ]
+
+
+
+disability_params <- fancy_direction[grepl("disability", fancy_direction$Parameter, ignore.case = TRUE), ]
+
+coping_appraisal_params <- fancy_direction[grepl("coping_appraisal", fancy_direction$Parameter, ignore.case = TRUE), ]
+
+
+
+threat_appraisal_params <- fancy_direction[grepl("threat_appraisal", fancy_direction$Parameter, ignore.case = TRUE), ]
+
+
+
+library(xtable)
+fancy_direction_table <- xtable(fancy_direction)
+print(fancy_direction_table, include.rownames = FALSE)
+
+
+```
+
+```{r}
+theta_summary <- posterior_summary(model_fancy2)[grep("^r_id\\[", rownames(posterior_summary)), ]
+
+
+ids <- gsub("r_id\\[|,Intercept\\]", "", rownames(theta_summary))
+
+theta_df <- data.frame(
+  id = as.integer(ids),
+  theta = theta_summary[, "Estimate"]
+)
+
+
+id_sample <- national_working_long[, c("id", "sample")]
+id_sample_unique <- unique(id_sample)
+
+
+theta_df <- merge(theta_df, id_sample_unique, by = "id")
+
+
+
+
+
+
+figure6 <- ggplot(theta_df, aes(x = theta, color = sample, fill = sample)) +
+  geom_density(alpha = 0.3, size = 1.2) +
+  labs(
+    title = "Preparedness Ability (θ) by Risk Type",
+    x = expression(theta),
+    y = "Density",
+    color = "Risk Type",
+    fill = "Risk Type"
+  ) +
+  scale_color_brewer(palette = "Dark2") +
+  scale_fill_brewer(palette = "Pastel2") +
+  theme_minimal(base_size = 14) +
+  theme(
+    # 背景与网格线
+    panel.grid.minor = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background = element_rect(fill = "white", color = NA),
+
+    # 图例设置
+    legend.position = "right",
+    legend.text = element_text(size = 20),
+    legend.title = element_text(size = 22, face = "bold"),
+    legend.key.size = unit(1.2, "lines"),
+
+    # 坐标轴设置
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20),
+    axis.text.x = element_text(size = 25),
+    axis.text.y = element_text(size = 25),
+
+    # 标题设置
+    plot.title = element_text(size = 20, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 12, color = "gray30")
+  )
+
+# 保存图像
+ggsave("figure6.png", plot = figure6, width = 15, height = 12, dpi = 300)
+```
+
+```{r}
+
+
+
+draws_df <- as_draws_df(model_fancy2)
+
+# 获取所有固定效应（b_ 开头）
+fixed_effect_vars <- names(draws_df)[grepl("^b_", names(draws_df))]
+
+# 逐个计算 mean, CI, PD
+fancy_direction <- map_dfr(fixed_effect_vars, function(var) {
+  samples <- draws_df[[var]]
+  mean_val <- mean(samples)
+  hdi <- quantile(samples, probs = c(0.025, 0.975))  
+  pd <- max(mean(samples > 0), mean(samples < 0))    
+  
+  tibble(
+    parameter = var,
+    mean = mean_val,
+    hdi_2.5 = hdi[1],
+    hdi_97.5 = hdi[2],
+    pd = pd
+  )
+})
+
+
+fancy_direction_table <- xtable(fancy_direction)
+print(fancy_direction_table, include.rownames = FALSE)
+
+
+```
+
+```{r}
+
+
+
+
+samples <- c("CoastalFlooding", "Hurricane", "Earthquake", "Wildfire", "RiverineFlooding")
+
+results <- lapply(samples, function(smp) {
+  param_name <- paste0("sample", smp, ":age")
+  message("Processing: ", param_name)
+
+  # 抽取后验样本
+  draws <- as.data.frame(as_draws_df(model_fancy2))
+
+  # 计算 age 的边际效应（主效应 + 交互项）
+  marginal_effect <- draws[["b_age"]] + draws[[paste0("b_", param_name)]]
+
+  # 后验估计与 CI
+  est <- mean(marginal_effect)
+  prob_positive <- mean(marginal_effect > 0)
+  ci <- quantile(marginal_effect, probs = c(0.025, 0.975))
+
+  data.frame(
+    sample = smp,
+    estimate = est,
+    ci_lower = ci[1],
+    ci_upper = ci[2],
+    prob_positive = prob_positive
+  )
+})
+
+age_effects_by_sample <- do.call(rbind, results)
+age_effects_by_sample$level <- "age"
+
+
+
+```
+
+```{r}
+
+
+samples <- c("CoastalFlooding", "Hurricane", "Earthquake", "Wildfire", "RiverineFlooding")
+
+results <- lapply(samples, function(smp) {
+  param_name <- paste0("sample", smp, ":education")
+  message("Processing: ", param_name)
+
+  # 抽取后验样本
+  draws <- as.data.frame(as_draws_df(model_fancy2))
+
+  # 计算教育主效应 + 交互项
+  marginal_effect <- draws[["b_education"]] + draws[[paste0("b_", param_name)]]
+
+  # 后验估计与CI
+  est <- mean(marginal_effect)
+  prob_positive <- mean(marginal_effect > 0)
+  ci <- quantile(marginal_effect, probs = c(0.025, 0.975))  # 95% HDI近似
+
+  data.frame(
+    sample = smp,
+    estimate = est,
+    ci_lower = ci[1],
+    ci_upper = ci[2],
+    prob_positive = prob_positive
+  )
+})
+
+edu_effects_by_sample <- do.call(rbind, results)
+edu_effects_by_sample$level <- "edu"
+
+marginal_effect<-rbind(age_effects_by_sample,edu_effects_by_sample)
+
+```
+
+```{r}
+samples <- c("CoastalFlooding", "Hurricane", "Earthquake", "Wildfire", "RiverineFlooding")
+
+results <- lapply(samples, function(smp) {
+  param_name <- paste0("sample", smp, ":income")
+  message("Processing: ", param_name)
+
+  # 抽取后验样本
+  draws <- as.data.frame(as_draws_df(model_fancy2))
+
+  # 计算 income 的边际效应（主效应 + 交互项）
+  marginal_effect <- draws[["b_income"]] + draws[[paste0("b_", param_name)]]
+
+  # 后验估计与 CI
+  est <- mean(marginal_effect)
+  prob_positive <- mean(marginal_effect > 0)
+  ci <- quantile(marginal_effect, probs = c(0.025, 0.975))
+
+  data.frame(
+    sample = smp,
+    estimate = est,
+    ci_lower = ci[1],
+    ci_upper = ci[2],
+    prob_positive = prob_positive
+  )
+})
+
+income_effects_by_sample <- do.call(rbind, results)
+income_effects_by_sample$level <- "income"
+
+marginal_effect<-rbind(marginal_effect,income_effects_by_sample)
+```
+
+```{r}
+samples <- c("CoastalFlooding", "Hurricane", "Earthquake", "Wildfire", "RiverineFlooding")
+
+results <- lapply(samples, function(smp) {
+  param_name <- paste0("sample", smp, ":coping_appraisal")
+  message("Processing: ", param_name)
+
+  # 抽取后验样本
+  draws <- as.data.frame(as_draws_df(model_fancy2))
+
+  # 计算 coping_appraisal 的边际效应（主效应 + 交互项）
+  marginal_effect <- draws[["b_coping_appraisal"]] + draws[[paste0("b_", param_name)]]
+
+  # 后验估计与 CI
+  est <- mean(marginal_effect)
+  prob_positive <- mean(marginal_effect > 0)
+  ci <- quantile(marginal_effect, probs = c(0.025, 0.975))
+
+  data.frame(
+    sample = smp,
+    estimate = est,
+    ci_lower = ci[1],
+    ci_upper = ci[2],
+    prob_positive = prob_positive
+  )
+})
+
+coping_appraisal_effects_by_sample <- do.call(rbind, results)
+coping_appraisal_effects_by_sample$level <- "coping_appraisal"
+
+marginal_effect<-rbind(marginal_effect,coping_appraisal_effects_by_sample)
+
+```
+
+```{r}
+library(posterior)
+library(dplyr)
+library(stringr)
+
+# 设置你要分析的 factor 变量名
+factor_var <- "homeownership"
+
+# 获取所有变量名
+vars <- variables(model_fancy2)
+
+# 提取该变量的所有 dummy levels（不包括 baseline）
+main_effect_vars <- vars[grepl(paste0("^b_", factor_var), vars) & !grepl(":", vars)]
+levels <- str_remove(main_effect_vars, paste0("^b_", factor_var))
+
+# 提取所有交互项 sample:factor_varLevel
+interaction_vars <- vars[grepl(paste0("^b_sample.*:", factor_var), vars)]
+interactions_df <- data.frame(
+  var = interaction_vars,
+  sample = str_match(interaction_vars, "^b_sample(.*):")[, 2],
+  level = str_match(interaction_vars, paste0(":", factor_var, "(.*)"))[, 2],
+  stringsAsFactors = FALSE
+)
+
+# 自动计算每个交互项的边际效应（主效应 + 交互项）
+draws <- as.data.frame(as_draws_df(model_fancy2))
+
+home_effects_by_sample <- interactions_df %>%
+  rowwise() %>%
+  mutate(
+    estimate = mean(draws[[paste0("b_", factor_var, level)]] + draws[[var]]),
+    prob_positive = mean((draws[[paste0("b_", factor_var, level)]] + draws[[var]]) > 0),
+    ci_lower = quantile(draws[[paste0("b_", factor_var, level)]] + draws[[var]], 0.025),
+    ci_upper = quantile(draws[[paste0("b_", factor_var, level)]] + draws[[var]], 0.975)
+  ) %>%
+  select(sample, level, estimate, ci_lower, ci_upper, prob_positive) %>%
+  ungroup()
+
+
+marginal_effect<-rbind(marginal_effect,home_effects_by_sample )
+
+```
+
+```{r}
+# 设置你要分析的 factor 变量名
+factor_var <- "disability"
+
+# 获取所有变量名
+vars <- variables(model_fancy2)
+
+# 提取该变量的所有 dummy levels（不包括 baseline）
+main_effect_vars <- vars[grepl(paste0("^b_", factor_var), vars) & !grepl(":", vars)]
+levels <- str_remove(main_effect_vars, paste0("^b_", factor_var))
+
+# 提取所有交互项 sample:factor_varLevel
+interaction_vars <- vars[grepl(paste0("^b_sample.*:", factor_var), vars)]
+interactions_df <- data.frame(
+  var = interaction_vars,
+  sample = str_match(interaction_vars, "^b_sample(.*):")[, 2],
+  level = str_match(interaction_vars, paste0(":", factor_var, "(.*)"))[, 2],
+  stringsAsFactors = FALSE
+)
+
+# 自动计算每个交互项的边际效应（主效应 + 交互项）
+draws <- as.data.frame(as_draws_df(model_fancy2))
+
+disability_effects_by_sample <- interactions_df %>%
+  rowwise() %>%
+  mutate(
+    estimate = mean(draws[[paste0("b_", factor_var, level)]] + draws[[var]]),
+    prob_positive = mean((draws[[paste0("b_", factor_var, level)]] + draws[[var]]) > 0),
+    ci_lower = quantile(draws[[paste0("b_", factor_var, level)]] + draws[[var]], 0.025),
+    ci_upper = quantile(draws[[paste0("b_", factor_var, level)]] + draws[[var]], 0.975)
+  ) %>%
+  select(sample, level, estimate, ci_lower, ci_upper, prob_positive) %>%
+  ungroup()
+
+marginal_effect<-rbind(marginal_effect,disability_effects_by_sample )
+```
+
+```{r}
+samples <- c("CoastalFlooding", "Hurricane", "Earthquake", "Wildfire", "RiverineFlooding")
+
+results <- lapply(samples, function(smp) {
+  param_name <- paste0("sample", smp, ":numchild")
+  message("Processing: ", param_name)
+
+  # 抽取后验样本
+  draws <- as.data.frame(as_draws_df(model_fancy2))
+
+  # 计算 numchild 的边际效应（主效应 + 交互项）
+  marginal_effect <- draws[["b_numchild"]] + draws[[paste0("b_", param_name)]]
+
+  # 后验估计与 CI
+  est <- mean(marginal_effect)
+  prob_positive <- mean(marginal_effect > 0)
+  ci <- quantile(marginal_effect, probs = c(0.025, 0.975))
+
+  data.frame(
+    sample = smp,
+    estimate = est,
+    ci_lower = ci[1],
+    ci_upper = ci[2],
+    prob_positive = prob_positive
+  )
+})
+
+numchild_effects_by_sample <- do.call(rbind, results)
+
+
+numchild_effects_by_sample $level <- "numchild"
+
+marginal_effect<-rbind(marginal_effect,numchild_effects_by_sample)
+
+
+```
+
+```{r}
+samples <- c("CoastalFlooding", "Hurricane", "Earthquake", "Wildfire", "RiverineFlooding")
+
+results <- lapply(samples, function(smp) {
+  param_name <- paste0("sample", smp, ":threat_appraisal")
+  message("Processing: ", param_name)
+
+  # 抽取后验样本
+  draws <- as.data.frame(as_draws_df(model_fancy2))
+
+  # 计算 threat_appraisal 的边际效应（主效应 + 交互项）
+  marginal_effect <- draws[["b_threat_appraisal"]] + draws[[paste0("b_", param_name)]]
+
+  # 后验估计与 CI
+  est <- mean(marginal_effect)
+  prob_positive <- mean(marginal_effect > 0)
+  ci <- quantile(marginal_effect, probs = c(0.025, 0.975))
+
+  data.frame(
+    sample = smp,
+    estimate = est,
+    ci_lower = ci[1],
+    ci_upper = ci[2],
+    prob_positive = prob_positive
+  )
+})
+
+threat_appraisal_effects_by_sample <- do.call(rbind, results)
+
+threat_appraisal_effects_by_sample $level <- "threat_appraisal"
+
+marginal_effect<-rbind(marginal_effect,threat_appraisal_effects_by_sample)
+
+marginal_effect_table <- xtable(marginal_effect)
+print(marginal_effect_table, include.rownames = FALSE)
+```
+
+```{r}
+# (age +sex+education + income+homeownership+numchild+disability+rurality+race_selfid_original+coping_appraisal+threat_appraisal
+
+factor_var <- "sex"
+
+# 获取所有变量名
+vars <- variables(model_fancy2)
+
+# 提取该变量的所有 dummy levels（不包括 baseline）
+main_effect_vars <- vars[grepl(paste0("^b_", factor_var), vars) & !grepl(":", vars)]
+levels <- str_remove(main_effect_vars, paste0("^b_", factor_var))
+
+# 提取所有交互项 sample:factor_varLevel
+interaction_vars <- vars[grepl(paste0("^b_sample.*:", factor_var), vars)]
+interactions_df <- data.frame(
+  var = interaction_vars,
+  sample = str_match(interaction_vars, "^b_sample(.*):")[, 2],
+  level = str_match(interaction_vars, paste0(":", factor_var, "(.*)"))[, 2],
+  stringsAsFactors = FALSE
+)
+
+
+draws <- as.data.frame(as_draws_df(model_fancy2))
+
+sex_effects_by_sample <- interactions_df %>%
+  rowwise() %>%
+  mutate(
+    estimate = mean(draws[[paste0("b_", factor_var, level)]] + draws[[var]]),
+    prob_positive = mean((draws[[paste0("b_", factor_var, level)]] + draws[[var]]) > 0),
+    ci_lower = quantile(draws[[paste0("b_", factor_var, level)]] + draws[[var]], 0.025),
+    ci_upper = quantile(draws[[paste0("b_", factor_var, level)]] + draws[[var]], 0.975)
+  ) %>%
+  select(sample, level, estimate, ci_lower, ci_upper, prob_positive) %>%
+  ungroup()
+
+  
+marginal_effect<-rbind(marginal_effect,sex_effects_by_sample)
+
+```
+
+```{r}
+factor_var <- "race_selfid_original"
+
+# 获取所有变量名
+vars <- variables(model_fancy2)
+
+# 提取该变量的所有 dummy levels（不包括 baseline）
+main_effect_vars <- vars[grepl(paste0("^b_", factor_var), vars) & !grepl(":", vars)]
+levels <- str_remove(main_effect_vars, paste0("^b_", factor_var))
+
+# 提取所有交互项 sample:factor_varLevel
+interaction_vars <- vars[grepl(paste0("^b_sample.*:", factor_var), vars)]
+interactions_df <- data.frame(
+  var = interaction_vars,
+  sample = str_match(interaction_vars, "^b_sample(.*):")[, 2],
+  level = str_match(interaction_vars, paste0(":", factor_var, "(.*)"))[, 2],
+  stringsAsFactors = FALSE
+)
+
+# 抽取 draws
+draws <- as.data.frame(as_draws_df(model_fancy2))
+
+# 计算主效应 + 交互效应的边际效应
+race_effects_by_sample <- interactions_df %>%
+  rowwise() %>%
+  mutate(
+    estimate = mean(draws[[paste0("b_", factor_var, level)]] + draws[[var]]),
+    prob_positive = mean((draws[[paste0("b_", factor_var, level)]] + draws[[var]]) > 0),
+    ci_lower = quantile(draws[[paste0("b_", factor_var, level)]] + draws[[var]], 0.025),
+    ci_upper = quantile(draws[[paste0("b_", factor_var, level)]] + draws[[var]], 0.975)
+  ) %>%
+  select(sample, level, estimate, ci_lower, ci_upper, prob_positive) %>%
+  ungroup()
+
+# 合并到已有的结果框
+marginal_effect <- rbind(marginal_effect, race_effects_by_sample)
+
+```
+
+```{r}
+factor_var <- "rurality"
+
+# 获取所有变量名
+vars <- variables(model_fancy2)
+
+# 提取该变量的所有 dummy levels（不包括 baseline）
+main_effect_vars <- vars[grepl(paste0("^b_", factor_var), vars) & !grepl(":", vars)]
+levels <- str_remove(main_effect_vars, paste0("^b_", factor_var))
+
+# 提取所有交互项 sample:factor_varLevel
+interaction_vars <- vars[grepl(paste0("^b_sample.*:", factor_var), vars)]
+interactions_df <- data.frame(
+  var = interaction_vars,
+  sample = str_match(interaction_vars, "^b_sample(.*):")[, 2],
+  level = str_match(interaction_vars, paste0(":", factor_var, "(.*)"))[, 2],
+  stringsAsFactors = FALSE
+)
+
+# 提取 draws
+draws <- as.data.frame(as_draws_df(model_fancy2))
+
+# 计算边际效应
+rurality_effects_by_sample <- interactions_df %>%
+  rowwise() %>%
+  mutate(
+    estimate = mean(draws[[paste0("b_", factor_var, level)]] + draws[[var]]),
+    prob_positive = mean((draws[[paste0("b_", factor_var, level)]] + draws[[var]]) > 0),
+    ci_lower = quantile(draws[[paste0("b_", factor_var, level)]] + draws[[var]], 0.025),
+    ci_upper = quantile(draws[[paste0("b_", factor_var, level)]] + draws[[var]], 0.975)
+  ) %>%
+  select(sample, level, estimate, ci_lower, ci_upper, prob_positive) %>%
+  ungroup()
+
+# 合并到已有边际效应框
+marginal_effect <- rbind(marginal_effect, rurality_effects_by_sample)
+
+marginal_effect_table <- xtable(marginal_effect)
+print(marginal_effect_table, include.rownames = FALSE)
+
+
+```
+
+```{r}
+install.packages("posterior")
+install.packages("coda") 
+install.packages("bayestestR") 
+
+```
+
+```{r}
+summary_fixed <- subset(fancy_model2_data, 
+                          
+                         !grepl("1\\|id",fancy_model2_data$X)    # 丢掉带 1|id
+)
+
+
+summary_significant <- subset(summary_fixed,
+                               (hdi_2.5. > 0 & hdi_97.5. > 0) |
+                               (hdi_2.5. < 0 & hdi_97.5. < 0)
+)
+```
+
+```{r}
+
+fancy_model_correct<-read.csv("C:\\Users\\Frank\\Documents\\GitHub\\-\\document\\fitted_model_final_correct.csv")
+
+
+summary_fixed <- subset(fancy_model_correct, 
+                          
+                         !grepl("1\\|id",fancy_model_correct$X)    # 丢掉带 1|id
+)
+
+
+summary_significant <- subset(summary_fixed,
+                               (hdi_2.5. > 0 & hdi_97.5. > 0) |
+                               (hdi_2.5. < 0 & hdi_97.5. < 0)
+)
+
+rm(model_fancy)
+```
+
+```{r}
+plot(model_fancy2)             # Trace plots
+pp_check(model_fancy2)         # Posterior predictive check
+rhat(model_fancy2)             # 检查收敛（Rhat ≈ 1）
+summary(model_fancy2)      
+
+```
