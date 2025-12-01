@@ -7,6 +7,7 @@ editor: visual
 ## Quarto
 
 ```{r}
+##dataloading and cleaning
 install.packages("pkgbuild")  
 pkgbuild::find_rtools()
 install.packages("ncdf4")
@@ -1121,7 +1122,7 @@ vif_model
 ```
 
 ```{r}
-# match
+# match(fail_model,do not inluce into final)
 library(MatchIt)
 national_match<-national_working%>%mutate(treatment=case_when(type=="HD_HP"~0,
                                                               type=="HD_LP"~1,
@@ -1225,7 +1226,7 @@ ggsave("figure5.png", plot=figure5,width = 15, height = 12, dpi = 300)
 ```
 
 ```{r}
-#model_building_fancy_model2
+#model_building_fancy_model2(test_mddel)
 
 national_working_long$sample <- relevel(factor(national_working_long$sample), ref = "National")
 
@@ -1359,24 +1360,24 @@ difficulity <- ggplot(item_effects_fancy_model, aes(x = reorder(item, Estimate),
   ) +
   theme_minimal(base_size = 14) +
   theme(
-    # 背景设置
+   
     panel.background = element_rect(fill = "white", color = NA),
     plot.background = element_rect(fill = "white", color = NA),
 
-    # 图例设置（如不需要图例，可设置为 "none"）
+   
     legend.position = "none",
 
-    # 坐标轴标题和刻度字体大小
+    
     axis.title.x = element_text(size = 18),
     axis.title.y = element_text(size = 15),
     axis.text.x = element_text(size = 20),
     axis.text.y = element_text(size = 15, angle = 45, hjust = 1),
 
-    # 标题和副标题设置
+    
     plot.title = element_text(size = 20, face = "bold", hjust = 0.5),
     plot.subtitle = element_text(size = 12, color = "gray30"),
 
-    # 网格线设置
+    
     panel.grid.minor = element_blank(),
     panel.grid.major.y = element_blank()
   )
@@ -1459,30 +1460,30 @@ figure6 <- ggplot(theta_df, aes(x = theta, color = sample, fill = sample)) +
   scale_fill_brewer(palette = "Pastel2") +
   theme_minimal(base_size = 14) +
   theme(
-    # 背景与网格线
+   
     panel.grid.minor = element_blank(),
     panel.grid.major.y = element_blank(),
     panel.background = element_rect(fill = "white", color = NA),
     plot.background = element_rect(fill = "white", color = NA),
 
-    # 图例设置
+    
     legend.position = "right",
     legend.text = element_text(size = 20),
     legend.title = element_text(size = 22, face = "bold"),
     legend.key.size = unit(1.2, "lines"),
 
-    # 坐标轴设置
+    
     axis.title.x = element_text(size = 20),
     axis.title.y = element_text(size = 20),
     axis.text.x = element_text(size = 25),
     axis.text.y = element_text(size = 25),
 
-    # 标题设置
+    
     plot.title = element_text(size = 20, face = "bold", hjust = 0.5),
     plot.subtitle = element_text(size = 12, color = "gray30")
   )
 
-# 保存图像
+
 ggsave("figure6.png", plot = figure6, width = 15, height = 12, dpi = 300)
 ```
 
@@ -1492,10 +1493,10 @@ ggsave("figure6.png", plot = figure6, width = 15, height = 12, dpi = 300)
 
 draws_df <- as_draws_df(model_fancy2)
 
-# 获取所有固定效应（b_ 开头）
+）
 fixed_effect_vars <- names(draws_df)[grepl("^b_", names(draws_df))]
 
-# 逐个计算 mean, CI, PD
+
 fancy_direction <- map_dfr(fixed_effect_vars, function(var) {
   samples <- draws_df[[var]]
   mean_val <- mean(samples)
@@ -1522,20 +1523,20 @@ print(fancy_direction_table, include.rownames = FALSE)
 
 
 
-
+##test_model2
 samples <- c("CoastalFlooding", "Hurricane", "Earthquake", "Wildfire", "RiverineFlooding")
 
 results <- lapply(samples, function(smp) {
   param_name <- paste0("sample", smp, ":age")
   message("Processing: ", param_name)
 
-  # 抽取后验样本
+ 
   draws <- as.data.frame(as_draws_df(model_fancy2))
 
-  # 计算 age 的边际效应（主效应 + 交互项）
+  
   marginal_effect <- draws[["b_age"]] + draws[[paste0("b_", param_name)]]
 
-  # 后验估计与 CI
+  
   est <- mean(marginal_effect)
   prob_positive <- mean(marginal_effect > 0)
   ci <- quantile(marginal_effect, probs = c(0.025, 0.975))
@@ -1558,20 +1559,20 @@ age_effects_by_sample$level <- "age"
 
 ```{r}
 
-
+##visualization and calculate presenting data, the result are output as latex which include in the final report
 samples <- c("CoastalFlooding", "Hurricane", "Earthquake", "Wildfire", "RiverineFlooding")
 
 results <- lapply(samples, function(smp) {
   param_name <- paste0("sample", smp, ":education")
   message("Processing: ", param_name)
 
-  # 抽取后验样本
+  
   draws <- as.data.frame(as_draws_df(model_fancy2))
 
-  # 计算教育主效应 + 交互项
+  
   marginal_effect <- draws[["b_education"]] + draws[[paste0("b_", param_name)]]
 
-  # 后验估计与CI
+  
   est <- mean(marginal_effect)
   prob_positive <- mean(marginal_effect > 0)
   ci <- quantile(marginal_effect, probs = c(0.025, 0.975))  # 95% HDI近似
@@ -1632,13 +1633,13 @@ results <- lapply(samples, function(smp) {
   param_name <- paste0("sample", smp, ":coping_appraisal")
   message("Processing: ", param_name)
 
-  # 抽取后验样本
+ 
   draws <- as.data.frame(as_draws_df(model_fancy2))
 
-  # 计算 coping_appraisal 的边际效应（主效应 + 交互项）
+  
   marginal_effect <- draws[["b_coping_appraisal"]] + draws[[paste0("b_", param_name)]]
 
-  # 后验估计与 CI
+  
   est <- mean(marginal_effect)
   prob_positive <- mean(marginal_effect > 0)
   ci <- quantile(marginal_effect, probs = c(0.025, 0.975))
@@ -1664,17 +1665,17 @@ library(posterior)
 library(dplyr)
 library(stringr)
 
-# 设置你要分析的 factor 变量名
+#regression model(we want to include that after we finsih the work on cluster, so we include it at R)
 factor_var <- "homeownership"
 
-# 获取所有变量名
+
 vars <- variables(model_fancy2)
 
-# 提取该变量的所有 dummy levels（不包括 baseline）
+
 main_effect_vars <- vars[grepl(paste0("^b_", factor_var), vars) & !grepl(":", vars)]
 levels <- str_remove(main_effect_vars, paste0("^b_", factor_var))
 
-# 提取所有交互项 sample:factor_varLevel
+
 interaction_vars <- vars[grepl(paste0("^b_sample.*:", factor_var), vars)]
 interactions_df <- data.frame(
   var = interaction_vars,
@@ -1683,7 +1684,7 @@ interactions_df <- data.frame(
   stringsAsFactors = FALSE
 )
 
-# 自动计算每个交互项的边际效应（主效应 + 交互项）
+
 draws <- as.data.frame(as_draws_df(model_fancy2))
 
 home_effects_by_sample <- interactions_df %>%
@@ -1703,13 +1704,13 @@ marginal_effect<-rbind(marginal_effect,home_effects_by_sample )
 ```
 
 ```{r}
-# 设置你要分析的 factor 变量名
+
 factor_var <- "disability"
 
-# 获取所有变量名
+
 vars <- variables(model_fancy2)
 
-# 提取该变量的所有 dummy levels（不包括 baseline）
+
 main_effect_vars <- vars[grepl(paste0("^b_", factor_var), vars) & !grepl(":", vars)]
 levels <- str_remove(main_effect_vars, paste0("^b_", factor_var))
 
@@ -1722,7 +1723,7 @@ interactions_df <- data.frame(
   stringsAsFactors = FALSE
 )
 
-# 自动计算每个交互项的边际效应（主效应 + 交互项）
+
 draws <- as.data.frame(as_draws_df(model_fancy2))
 
 disability_effects_by_sample <- interactions_df %>%
@@ -1746,13 +1747,13 @@ results <- lapply(samples, function(smp) {
   param_name <- paste0("sample", smp, ":numchild")
   message("Processing: ", param_name)
 
-  # 抽取后验样本
+ 
   draws <- as.data.frame(as_draws_df(model_fancy2))
 
-  # 计算 numchild 的边际效应（主效应 + 交互项）
+  
   marginal_effect <- draws[["b_numchild"]] + draws[[paste0("b_", param_name)]]
 
-  # 后验估计与 CI
+  
   est <- mean(marginal_effect)
   prob_positive <- mean(marginal_effect > 0)
   ci <- quantile(marginal_effect, probs = c(0.025, 0.975))
@@ -1783,13 +1784,12 @@ results <- lapply(samples, function(smp) {
   param_name <- paste0("sample", smp, ":threat_appraisal")
   message("Processing: ", param_name)
 
-  # 抽取后验样本
   draws <- as.data.frame(as_draws_df(model_fancy2))
 
-  # 计算 threat_appraisal 的边际效应（主效应 + 交互项）
+  
   marginal_effect <- draws[["b_threat_appraisal"]] + draws[[paste0("b_", param_name)]]
 
-  # 后验估计与 CI
+  
   est <- mean(marginal_effect)
   prob_positive <- mean(marginal_effect > 0)
   ci <- quantile(marginal_effect, probs = c(0.025, 0.975))
@@ -1818,14 +1818,14 @@ print(marginal_effect_table, include.rownames = FALSE)
 
 factor_var <- "sex"
 
-# 获取所有变量名
+
 vars <- variables(model_fancy2)
 
-# 提取该变量的所有 dummy levels（不包括 baseline）
+
 main_effect_vars <- vars[grepl(paste0("^b_", factor_var), vars) & !grepl(":", vars)]
 levels <- str_remove(main_effect_vars, paste0("^b_", factor_var))
 
-# 提取所有交互项 sample:factor_varLevel
+
 interaction_vars <- vars[grepl(paste0("^b_sample.*:", factor_var), vars)]
 interactions_df <- data.frame(
   var = interaction_vars,
@@ -1856,14 +1856,14 @@ marginal_effect<-rbind(marginal_effect,sex_effects_by_sample)
 ```{r}
 factor_var <- "race_selfid_original"
 
-# 获取所有变量名
+
 vars <- variables(model_fancy2)
 
-# 提取该变量的所有 dummy levels（不包括 baseline）
+
 main_effect_vars <- vars[grepl(paste0("^b_", factor_var), vars) & !grepl(":", vars)]
 levels <- str_remove(main_effect_vars, paste0("^b_", factor_var))
 
-# 提取所有交互项 sample:factor_varLevel
+
 interaction_vars <- vars[grepl(paste0("^b_sample.*:", factor_var), vars)]
 interactions_df <- data.frame(
   var = interaction_vars,
@@ -1872,10 +1872,10 @@ interactions_df <- data.frame(
   stringsAsFactors = FALSE
 )
 
-# 抽取 draws
+
 draws <- as.data.frame(as_draws_df(model_fancy2))
 
-# 计算主效应 + 交互效应的边际效应
+
 race_effects_by_sample <- interactions_df %>%
   rowwise() %>%
   mutate(
@@ -1895,14 +1895,14 @@ marginal_effect <- rbind(marginal_effect, race_effects_by_sample)
 ```{r}
 factor_var <- "rurality"
 
-# 获取所有变量名
+
 vars <- variables(model_fancy2)
 
-# 提取该变量的所有 dummy levels（不包括 baseline）
+
 main_effect_vars <- vars[grepl(paste0("^b_", factor_var), vars) & !grepl(":", vars)]
 levels <- str_remove(main_effect_vars, paste0("^b_", factor_var))
 
-# 提取所有交互项 sample:factor_varLevel
+
 interaction_vars <- vars[grepl(paste0("^b_sample.*:", factor_var), vars)]
 interactions_df <- data.frame(
   var = interaction_vars,
@@ -1911,10 +1911,10 @@ interactions_df <- data.frame(
   stringsAsFactors = FALSE
 )
 
-# 提取 draws
+
 draws <- as.data.frame(as_draws_df(model_fancy2))
 
-# 计算边际效应
+
 rurality_effects_by_sample <- interactions_df %>%
   rowwise() %>%
   mutate(
@@ -1926,7 +1926,7 @@ rurality_effects_by_sample <- interactions_df %>%
   select(sample, level, estimate, ci_lower, ci_upper, prob_positive) %>%
   ungroup()
 
-# 合并到已有边际效应框
+
 marginal_effect <- rbind(marginal_effect, rurality_effects_by_sample)
 
 marginal_effect_table <- xtable(marginal_effect)
@@ -1962,7 +1962,7 @@ fancy_model_correct<-read.csv("C:\\Users\\Frank\\Documents\\GitHub\\-\\document\
 
 summary_fixed <- subset(fancy_model_correct, 
                           
-                         !grepl("1\\|id",fancy_model_correct$X)    # 丢掉带 1|id
+                         !grepl("1\\|id",fancy_model_correct$X)   
 )
 
 
@@ -1977,7 +1977,7 @@ rm(model_fancy)
 ```{r}
 plot(model_fancy2)             # Trace plots
 pp_check(model_fancy2)         # Posterior predictive check
-rhat(model_fancy2)             # 检查收敛（Rhat ≈ 1）
+rhat(model_fancy2)         
 summary(model_fancy2)      
 
 ```
