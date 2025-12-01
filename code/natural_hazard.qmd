@@ -1162,8 +1162,7 @@ national_working_long <- national_working %>%
     names_to = "item",
     values_to = "response"
   ) %>%
-  mutate(response = as.factor(response))  # 如果你想让 response 是 factor 类型
-
+  mutate(response = as.factor(response))  
 
 
 national_working_long <- national_working_long %>%
@@ -1945,7 +1944,7 @@ install.packages("bayestestR")
 ```{r}
 summary_fixed <- subset(fancy_model2_data, 
                           
-                         !grepl("1\\|id",fancy_model2_data$X)    # 丢掉带 1|id
+                         !grepl("1\\|id",fancy_model2_data$X)   
 )
 
 
