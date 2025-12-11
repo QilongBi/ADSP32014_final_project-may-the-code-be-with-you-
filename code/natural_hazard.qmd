@@ -1599,13 +1599,13 @@ results <- lapply(samples, function(smp) {
   param_name <- paste0("sample", smp, ":income")
   message("Processing: ", param_name)
 
-  # 抽取后验样本
+ 
   draws <- as.data.frame(as_draws_df(model_fancy2))
 
-  # 计算 income 的边际效应（主效应 + 交互项）
+ #test model1111111111111
   marginal_effect <- draws[["b_income"]] + draws[[paste0("b_", param_name)]]
 
-  # 后验估计与 CI
+
   est <- mean(marginal_effect)
   prob_positive <- mean(marginal_effect > 0)
   ci <- quantile(marginal_effect, probs = c(0.025, 0.975))
